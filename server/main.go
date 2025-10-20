@@ -14,6 +14,7 @@ func main() {
 	})
 
 	router.GET("/movies", controllers.GetMovies())
+	router.GET("/movies/:imdb_id", controllers.GetMovieById())
 
 	err := router.Run(":2000")
 	if err != nil {
