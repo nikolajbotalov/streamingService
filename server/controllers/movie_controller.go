@@ -13,7 +13,7 @@ import (
 )
 
 var movieCollection *mongo.Collection = database.OpenCollection("movies")
-var validate = validator.New()
+var movieValidate = validator.New()
 
 func GetMovies() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -70,7 +70,7 @@ func AddMovie() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 			return
 		}
-		if err := validate.Struct(movie); err != nil {
+		if err := movieValidate.Struct(movie); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Validation failed", "details": err.Error()})
 			return
 		}
