@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"server/controllers"
+	"server/routes"
 )
 
 func main() {
@@ -13,12 +13,8 @@ func main() {
 		c.String(200, "Hello world")
 	})
 
-	router.GET("/movies", controllers.GetMovies())
-	router.GET("/movies/:imdb_id", controllers.GetMovieById())
-	router.POST("/movies/", controllers.AddMovie())
-
-	router.POST("/register", controllers.RegisterUser())
-	router.POST("/login", controllers.LoginUser())
+	routes.SetupUnprotectedRoutes(router)
+	routes.SetupProtectedRoutes(router)
 
 	err := router.Run(":2000")
 	if err != nil {
