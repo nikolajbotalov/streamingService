@@ -18,6 +18,7 @@ func main() {
 	router.POST("/movies/", controllers.AddMovie())
 
 	router.POST("/register", controllers.RegisterUser())
+	router.POST("/login", controllers.LoginUser())
 
 	err := router.Run(":2000")
 	if err != nil {
