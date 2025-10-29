@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
@@ -98,6 +99,16 @@ func AddMovie() gin.HandlerFunc {
 
 func AdminReviewUpdate() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userRole, err := utils.GetUserRoleFromContext(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get user role"})
+			return
+		}
+		if userRole != "ADMIN" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "You do not have permission"})
+			return
+		}
+
 		movieID := c.Param("imdb_id")
 		if movieID == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Movie ID required"})
@@ -174,24 +185,47 @@ func GetReviewRanking(adminReview string) (string, int, error) {
 	err = godotenv.Load(".env")
 	if err != nil {
 		log.Println("Warning: .env file not found")
-		return "", 0, err
 	}
 
-	openAiApiKey := os.Getenv("OPENAI_API_KEY")
-	if openAiApiKey == "" {
-		return "", 0, errors.New("could not read OPENAI_API_KEY")
+	grokApiKey := os.Getenv("GROK_API_KEY")
+	if grokApiKey == "" {
+		return "", 0, errors.New("could not read GROK_API_KEY")
 	}
 
-	llm, err := openai.New(openai.WithToken(openAiApiKey))
+	basePromptTemplate := os.Getenv("BASE_PROMPT_TEMPLATE")
+	if basePromptTemplate == "" {
+		return "", 0, errors.New("could not read BASE_PROMPT_TEMPLATE")
+	}
+
+	aiBaseURL := os.Getenv("AI_BASE_URL")
+	if aiBaseURL == "" {
+		return "", 0, errors.New("could not read AI_BASE_URL")
+	}
+
+	aiModel := os.Getenv("AI_MODEL")
+	if aiModel == "" {
+		return "", 0, errors.New("could not read AI_MODEL")
+	}
+
+	fmt.Println("base_prompt_template", basePromptTemplate)
+
+	llm, err := openai.New(
+		openai.WithToken(grokApiKey),
+		openai.WithBaseURL(aiBaseURL),
+		openai.WithModel(aiModel),
+	)
 	if err != nil {
 		return "", 0, err
 	}
 
-	basePromptTemplate := os.Getenv("BASE_PROMPT_TEMPLATE")
-
 	basePrompt := strings.Replace(basePromptTemplate, "{rankings}", sentimentDelimited, 1)
+	fullPrompt := basePrompt + adminReview
 
-	response, err := llm.Call(context.Background(), basePrompt+adminReview)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	defer cancel()
+
+	response, err := llm.Call(ctx, fullPrompt)
+	fmt.Println(response, err)
 	if err != nil {
 		return "", 0, err
 	}
