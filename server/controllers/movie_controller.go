@@ -22,15 +22,14 @@ import (
 	"time"
 )
 
-var movieCollection *mongo.Collection = database.OpenCollection("movies")
 var movieValidate = validator.New()
 
-var rankingCollection *mongo.Collection = database.OpenCollection("rankings")
-
-func GetMovies() gin.HandlerFunc {
+func GetMovies(client *mongo.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
+
+		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
 
 		var movies []models.Movie
 
@@ -48,7 +47,7 @@ func GetMovies() gin.HandlerFunc {
 	}
 }
 
-func GetMovieById() gin.HandlerFunc {
+func GetMovieById(client *mongo.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
@@ -58,6 +57,8 @@ func GetMovieById() gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Movie ID is required"})
 			return
 		}
+
+		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
 
 		var movie models.Movie
 
@@ -71,10 +72,12 @@ func GetMovieById() gin.HandlerFunc {
 	}
 }
 
-func AddMovie() gin.HandlerFunc {
+func AddMovie(client *mongo.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
+
+		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
 
 		var movie models.Movie
 
@@ -97,7 +100,7 @@ func AddMovie() gin.HandlerFunc {
 	}
 }
 
-func AdminReviewUpdate() gin.HandlerFunc {
+func AdminReviewUpdate(client *mongo.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRole, err := utils.GetUserRoleFromContext(c)
 		if err != nil {
@@ -128,7 +131,7 @@ func AdminReviewUpdate() gin.HandlerFunc {
 			return
 		}
 
-		sentiment, rankValue, err := GetReviewRanking(req.AdminReview)
+		sentiment, rankValue, err := GetReviewRanking(req.AdminReview, client)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting review ranking"})
 			return
@@ -149,6 +152,8 @@ func AdminReviewUpdate() gin.HandlerFunc {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
+		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
+
 		result, err := movieCollection.UpdateOne(ctx, filter, update)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating movie"})
@@ -166,8 +171,8 @@ func AdminReviewUpdate() gin.HandlerFunc {
 	}
 }
 
-func GetReviewRanking(adminReview string) (string, int, error) {
-	rankings, err := GetRankings()
+func GetReviewRanking(adminReview string, client *mongo.Client) (string, int, error) {
+	rankings, err := GetRankings(client)
 	if err != nil {
 		return "", 0, err
 	}
@@ -242,11 +247,13 @@ func GetReviewRanking(adminReview string) (string, int, error) {
 	return response, rankVal, nil
 }
 
-func GetRankings() ([]models.Ranking, error) {
+func GetRankings(client *mongo.Client) ([]models.Ranking, error) {
 	var rankings []models.Ranking
 
 	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
+
+	var rankingCollection *mongo.Collection = database.OpenCollection("rankings", client)
 
 	cursor, err := rankingCollection.Find(ctx, bson.M{})
 	if err != nil {
@@ -261,7 +268,7 @@ func GetRankings() ([]models.Ranking, error) {
 	return rankings, nil
 }
 
-func GetRecommendedMovies() gin.HandlerFunc {
+func GetRecommendedMovies(client *mongo.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, err := utils.GetUserIDFromContext(c)
 		if err != nil {
@@ -269,7 +276,7 @@ func GetRecommendedMovies() gin.HandlerFunc {
 			return
 		}
 
-		favouriteGenres, err := GetUsersFavouriteGenres(userID)
+		favouriteGenres, err := GetUsersFavouriteGenres(userID, client)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -296,6 +303,8 @@ func GetRecommendedMovies() gin.HandlerFunc {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
+		var movieCollection *mongo.Collection = database.OpenCollection("movies", client)
+
 		cursor, err := movieCollection.Find(ctx, filter, findOptions)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching recommended movies"})
@@ -314,7 +323,7 @@ func GetRecommendedMovies() gin.HandlerFunc {
 	}
 }
 
-func GetUsersFavouriteGenres(userID string) ([]string, error) {
+func GetUsersFavouriteGenres(userID string, client *mongo.Client) ([]string, error) {
 	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
@@ -327,6 +336,8 @@ func GetUsersFavouriteGenres(userID string) ([]string, error) {
 
 	opts := options.FindOne().SetProjection(projection)
 	var result = bson.M{}
+
+	var userCollection *mongo.Collection = database.OpenCollection("users", client)
 
 	err := userCollection.FindOne(ctx, filter, opts).Decode(&result)
 	if err != nil {
@@ -354,4 +365,29 @@ func GetUsersFavouriteGenres(userID string) ([]string, error) {
 	}
 
 	return genreNames, nil
+}
+
+func GetGenres(client *mongo.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
+		var genresCollection *mongo.Collection = database.OpenCollection("genres", client)
+
+		var genres []models.Genre
+
+		cursor, err := genresCollection.Find(ctx, bson.M{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch genres"})
+			return
+		}
+		defer cursor.Close(ctx)
+
+		if err := cursor.All(ctx, &genres); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode genres"})
+			return
+		}
+
+		c.JSON(http.StatusOK, genres)
+	}
 }

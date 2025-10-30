@@ -66,7 +66,7 @@ func GenerateAllTokens(email, firstName, lastName, role, userID string) (string,
 	return signedToken, signedRefreshToken, nil
 }
 
-func UpdateAllTokens(userID, token, refreshToken string) (err error) {
+func UpdateAllTokens(userID, token, refreshToken string, client *mongo.Client) (err error) {
 	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
@@ -80,7 +80,7 @@ func UpdateAllTokens(userID, token, refreshToken string) (err error) {
 		},
 	}
 
-	var userCollection *mongo.Collection = database.OpenCollection("users")
+	var userCollection *mongo.Collection = database.OpenCollection("users", client)
 
 	_, err = userCollection.UpdateOne(ctx, bson.M{"user_id": userID}, updateData)
 	if err != nil {
