@@ -66,8 +66,8 @@ func GenerateAllTokens(email, firstName, lastName, role, userID string) (string,
 	return signedToken, signedRefreshToken, nil
 }
 
-func UpdateAllTokens(userID, token, refreshToken string, client *mongo.Client) (err error) {
-	var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+func UpdateAllTokens(userID, token, refreshToken string, client *mongo.Client, c *gin.Context) (err error) {
+	var ctx, cancel = context.WithTimeout(c, 6*time.Second)
 	defer cancel()
 
 	updateAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
